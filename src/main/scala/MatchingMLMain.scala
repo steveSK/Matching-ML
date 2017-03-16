@@ -5,7 +5,7 @@ import java.util.Properties
 
 import matching.lucene.analyzers.SkipGramAnalyzerWithTokenizer
 import org.apache.spark.network.sasl.SparkSaslServer
-import matching.datamining.worldcheck.FeatureGenerator
+import matching.ml.datamining.worldcheck.FeatureGenerator
 import matching.ml.spark.{AlgorithmEvaluator, SparkService}
 import org.apache.mesos.Protos.Resource
 import org.apache.spark.ml.Pipeline
