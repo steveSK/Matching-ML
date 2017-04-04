@@ -1,6 +1,7 @@
 package matching.ml.spark
 
-import org.apache.spark.SparkConf
+import kafka.serializer.StringDecoder
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.ml._
 import org.apache.spark.ml.classification.{LogisticRegression, NaiveBayes, RandomForestClassifier}
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
@@ -10,6 +11,8 @@ import org.apache.spark.ml.regression.RandomForestRegressor
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
 import org.apache.spark.mllib.classification.{ClassificationModel, NaiveBayesModel}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.streaming.kafka010._
+import collection.JavaConverters._
 
 //import org.apache.spark.mllib.classification.{NaiveBayes, NaiveBayesModel}
 import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
@@ -19,11 +22,12 @@ import org.apache.spark.sql.{Dataset, Row, SparkSession}
 /**
   * Created by stefan on 12/19/16.
   */
-class SparkService {
+class SparkService(sc: SparkContext) {
 
 
   val sparkSession = SparkSession.builder().getOrCreate()
   sparkSession.sqlContext.setConf("matching.spark.sql.shuffle.partitions", "6")
+  sparkSession.sqlContext.setConf("spark.streaming.kafka.consumer.poll.ms","2000");
   import sparkSession.implicits._
 
 
@@ -43,13 +47,7 @@ class SparkService {
   }
 
   def buildRandomForest(numClasses: Int, numTrees: Int, maxBins: Int, maxDepth: Int, featureSubsetStrategy: String, impurity: String, maxMemory: Int): RandomForestClassifier = {
-   // val numClasses = 2
     val categoricalFeaturesInfo = Map[Int, Int]()
-  //  val numTrees = 30 // Use more in practice.
-  //  val featureSubsetStrategy = "auto" // Let the algorithm choose.
-  //  val impurity = "entropy"
-  //  val maxDepth = 12
- //   val maxBins = 16
     return new RandomForestClassifier()
       .setNumTrees(numTrees)
       .setMaxBins(maxBins)
@@ -83,6 +81,16 @@ class SparkService {
     return metrics.areaUnderROC()
   }
 
+ /* def makeGrid( estimator:Estimator[_] ): ParamGridBuilder= {
+    val paramMap = estimator.extractParamMap();
+    val param1 = estimator.getParam("hashingTF");
+    val param2 = estimator.getParam("regParam");
+    new ParamGridBuilder()
+      .addGrid(paramMap(param1), Array(10, 100, 1000))
+      .addGrid(paramMap(param2), Array(0.1, 0.01))
+      .build()
+  } */
+
   def evaluateTestDataML(testDF: Dataset[_], model :  Transformer): Double ={
     val predictions = model.transform(testDF.toDF())
     predictions.select("prediction", "label", "features").show(5)
@@ -93,12 +101,12 @@ class SparkService {
     return evaluator.evaluate(predictions)
   }
 
-  def crossValidate(trainDF: DataFrame, paramGrid: Array[ParamMap], pipeline: Pipeline, nFolds : Int) : Transformer = {
+  def crossValidate(trainDF: DataFrame, paramGrid: Array[ParamMap], pipeline: Estimator[_], nFolds : Int) : Transformer = {
     val evaluator = new MulticlassClassificationEvaluator()
     .setLabelCol("label")
     .setPredictionCol("prediction")
     .setMetricName("accuracy")
-
+    pipeline
     val cv = new CrossValidator()
       // ml.Pipeline with ml.classification.RandomForestClassifier
       .setEstimator(pipeline)
@@ -110,45 +118,61 @@ class SparkService {
     return cv.fit(trainDF)
   }
 
-  def getTrainAndTestDataFromFileML(datasetFile: String, weights: Array[Double], seed: Int, ignored: List[String]): (RDD[LabeledPoint],
+  def getTrainAndTestDataFromFileML(datasetFile: String, weights: Array[Double], seed: Int, ignored: List[String], labelName: String): (RDD[LabeledPoint],
     RDD[LabeledPoint]) ={
     val rawDF = loadDataFromCSV(datasetFile, sparkSession)
     val listDFs =  rawDF.randomSplit(weights,seed).map(x => x.toDF())
     val trainDF = listDFs(0)
     val testDF = listDFs(1)
 
-    return (transformRawDFToLabeledPointRDDML(trainDF,sparkSession,11,ignored), transformRawDFToLabeledPointRDDML(testDF,sparkSession,11,ignored))
+    return (transformRawDFToLabeledPointRDDML(trainDF,sparkSession,labelName,ignored), transformRawDFToLabeledPointRDDML(testDF,sparkSession,labelName,ignored))
   }
 
-  def getTrainAndTestDataFromFileMLlib(datasetFile: String, weights: Array[Double], seed: Int, ignored: List[String]): (RDD[org.apache.spark.mllib.regression.LabeledPoint],
+  def getTrainAndTestDataFromKafka(topic: String,offsets: Array[(Int,Int)], params:Map[String,Object], weights: Array[Double], seed: Int, ignored: List[String], labelName: String): (RDD[LabeledPoint],
+    RDD[LabeledPoint]) ={
+    val rawDF = loadDataFromKafka(topic,offsets, params, sparkSession)
+    rawDF.show()
+    println("COUNT IS: " + rawDF.count())
+    val listDFs =  rawDF.randomSplit(weights,seed).map(x => x.toDF())
+    val trainDF = listDFs(0)
+    val testDF = listDFs(1)
+
+    return (transformRawDFToLabeledPointRDDML(trainDF,sparkSession,labelName,ignored), transformRawDFToLabeledPointRDDML(testDF,sparkSession,labelName,ignored))
+  }
+
+  def getTrainAndTestDataFromFileMLlib(datasetFile: String, weights: Array[Double], seed: Int, ignored: List[String], labelName: String): (RDD[org.apache.spark.mllib.regression.LabeledPoint],
     RDD[org.apache.spark.mllib.regression.LabeledPoint]) ={
     val rawDF = loadDataFromCSV(datasetFile, sparkSession)
     val listDFs =  rawDF.randomSplit(weights,seed).map(x => x.toDF())
     val trainDF = listDFs(0)
     val testDF = listDFs(1)
 
-    return (transformRawDFToLabeledPointRDDMLlib(trainDF,sparkSession,11,ignored), transformRawDFToLabeledPointRDDMLlib(testDF,sparkSession,11,ignored))
+    return (transformRawDFToLabeledPointRDDMLlib(trainDF,sparkSession,labelName,ignored), transformRawDFToLabeledPointRDDMLlib(testDF,sparkSession,labelName,ignored))
   }
 
-
-
-
-   def loadDataFromCSV(filepath: String, sparkSession: SparkSession): Dataset[Row] = {
+  def loadDataFromCSV(filepath: String, sparkSession: SparkSession): Dataset[Row] = {
     sparkSession.read.option("header", "true")
       .option("delimiter", ";")
       .option("inferSchema", "true")
       .format("csv").load(filepath)
   }
 
-  def transformRawDFToLabeledPointRDDML(df: Dataset[Row], sparkSession: SparkSession, labelIndex: Int,ignored: List[String]): RDD[LabeledPoint] = {
+  def loadDataFromKafka(topic: String,offsets: Array[(Int,Int)], kafkaParams : Map[String,Object], sparkSession: SparkSession): Dataset[Row] = {
+      val offsetRange = offsets.map(x => OffsetRange(topic,x._1,0,x._2))
+      val rdd = KafkaUtils.createRDD[String,String](sparkSession.sparkContext,kafkaParams.asJava,offsetRange,LocationStrategies.PreferConsistent).map(x => x.value())
+      sparkSession.read.json(rdd)
+  }
+
+  def transformRawDFToLabeledPointRDDML(df: Dataset[Row], sparkSession: SparkSession, labelName: String,ignored: List[String]): RDD[LabeledPoint] = {
      val featInd = df.columns.diff(ignored).map(df.columns.indexOf(_))
-     println(featInd.toString)
+     val labelIndex = df.columns.indexOf(labelName)
      df.rdd.map(x => LabeledPoint(x.getDouble(labelIndex), org.apache.spark.ml.linalg.Vectors.dense(featInd.map(x.get(_).toString.toDouble))))
   }
 
 
-  def transformRawDFToLabeledPointRDDMLlib(df: Dataset[Row], sparkSession: SparkSession, labelIndex: Int,ignored: List[String]): RDD[org.apache.spark.mllib.regression.LabeledPoint] = {
+  def transformRawDFToLabeledPointRDDMLlib(df: Dataset[Row], sparkSession: SparkSession, labelName: String,ignored: List[String]): RDD[org.apache.spark.mllib.regression.LabeledPoint] = {
     val featInd = df.columns.diff(ignored).map(df.columns.indexOf(_))
+    val labelIndex = df.columns.indexOf(labelName)
     df.rdd.map(x => org.apache.spark.mllib.regression.LabeledPoint(x.getDouble(labelIndex), org.apache.spark.mllib.linalg.Vectors.dense(featInd.map(x.get(_).toString.toDouble))))
 
   }

@@ -4,14 +4,8 @@ import java.io.{File, FileInputStream, PrintWriter}
 import java.util.Properties
 
 import matching.lucene.analyzers.SkipGramAnalyzerWithTokenizer
-import org.apache.spark.network.sasl.SparkSaslServer
-import matching.ml.datamining.worldcheck.FeatureGenerator
 import matching.ml.spark.{AlgorithmEvaluator, SparkService}
-import org.apache.mesos.Protos.Resource
-import org.apache.spark.ml.Pipeline
-import org.apache.spark.ml.tuning.ParamGridBuilder
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{Dataset, Row, SparkSession}
+import org.apache.kafka.common.serialization.StringDeserializer
 
 import scala.io.Source
 
@@ -21,6 +15,17 @@ import scala.io.Source
 object MatchingMLMain {
   private val analyzer = new SkipGramAnalyzerWithTokenizer(1, 3)
   private val prop = new Properties()
+  private val kafkaParams = Map[String, Object](
+    "bootstrap.servers" -> "192.158.0.145:9092",
+    "key.deserializer" -> classOf[StringDeserializer],
+    "value.deserializer" -> classOf[StringDeserializer],
+    "group.id" -> "0",
+    "auto.offset.reset" -> "latest",
+    "enable.auto.commit" -> (true: java.lang.Boolean),
+    "request.timeout.ms" -> (40000: java.lang.Integer),
+    "heartbeat.interval.ms" -> (3000: java.lang.Integer),
+    "auto.commit.interval.ms" -> (500: java.lang.Integer)
+  )
 //  private val resultfile = "~/test-result"
   /*  private val inputFile = "/media/stefan/D27C48117C47EEB3/matching-data/aliases-set"
     private val cleanedInputFile = "/media/stefan/D27C48117C47EEB3/matching-data/aliases-set-cleaned"
@@ -40,7 +45,7 @@ object MatchingMLMain {
     System.out.println("Start with mining: ")
     val propertyFile = args(0)
     prop.load(new FileInputStream(propertyFile))
-    val inputFile = prop.getProperty("input.file")
+    val inputFile = prop.getProperty("input.file.set")
     val cleanedInputFile = prop.getProperty("input.file.cleaned")
     val outputFPFile = prop.getProperty("output.file.fp")
     val outputTPFile = prop.getProperty("output.file.tp")
@@ -67,11 +72,17 @@ object MatchingMLMain {
     //  val fg = new FeatureGenerator(labeledOutputFile)
     //   fg.generateFeatures(featuredDataSetFile,frequencyNameFile)
 
-    val service = new SparkService()
+    val service = new SparkService(null)
     val evaluator = new AlgorithmEvaluator(service)
     val ignored = List("string1", "string2", "label")
     val featuresNames = firstLine(new File(featuredDataSetFile.replace("file://","").replace("file:",""))).get.split(";").toList.filter(x => !ignored.contains(x))
-    val datasets = service.getTrainAndTestDataFromFileML(featuredDataSetFile, Array(0.9, 0.1), 42, ignored)
+   // val datasets = service.getTrainAndTestDataFromFileML(featuredDataSetFile, Array(0.9, 0.1), 42, ignored)
+    val weights = Array(0.9, 0.1)
+    val seed = 42
+    val topic = "test"
+    val offsets = Array((0,460095))
+    val labelName = "offset"
+    val datasets = service.getTrainAndTestDataFromKafka(topic,offsets,kafkaParams,weights,seed,ignored,labelName)
     val fullDataset = datasets._1 ++ datasets._2
 
 
