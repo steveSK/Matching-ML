@@ -35,12 +35,13 @@ class MatchingMLJob extends SparkJob {
     val similarityRatio = config.getString("similarity.ratio").toDouble
     val numberOfFeautures = config.getString("features.number").toInt
 
-    val service = new SparkService(sc)
+    val service = new SparkService
     val evaluator = new AlgorithmEvaluator(service)
     val ignored = List("string1", "string2", "label")
-    val featuresNames = firstLine(new File(featuredDataSetFile.replace("file://","").replace("file:",""))).get.split(";").toList.filter(x => !ignored.contains(x))
     val labelName = "label"
-    val datasets = service.getTrainAndTestDataFromFileML(featuredDataSetFile, Array(0.9, 0.1), 42, ignored,labelName)
+    val rawDataset = service.loadDataFromCSV(featuredDataSetFile)
+    val featuresNames = rawDataset.columns.filter(x => !ignored.contains(x))
+    val datasets = service.getTrainAndTestData(rawDataset, Array(0.9, 0.1), 42, ignored,labelName)
     val fullDataset = datasets._1 ++ datasets._2
 
     val writer = new PrintWriter(config.getString("output.file.result"))
