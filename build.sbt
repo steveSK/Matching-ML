@@ -19,6 +19,7 @@ libraryDependencies += "org.apache.spark" % "spark-sql_2.11" % "2.1.0"
 libraryDependencies += "org.apache.spark" % "spark-mllib_2.11" % "2.1.0"
 libraryDependencies += "org.apache.spark" % "spark-streaming_2.11" % "2.1.0"
 libraryDependencies += "org.apache.spark" % "spark-streaming-kafka-0-10_2.11" % "2.1.0"
+libraryDependencies += "org.apache.spark" % "spark-sql-kafka-0-10_2.11" % "2.1.0"
 libraryDependencies += "com.typesafe" % "config" % "1.3.1"
 
 assemblyMergeStrategy in assembly := {
