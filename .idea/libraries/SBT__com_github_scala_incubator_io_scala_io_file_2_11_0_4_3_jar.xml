@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="SBT: com.github.scala-incubator.io:scala-io-file_2.11:0.4.3:jar">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.ivy2/cache/com.github.scala-incubator.io/scala-io-file_2.11/jars/scala-io-file_2.11-0.4.3.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.ivy2/cache/com.github.scala-incubator.io/scala-io-file_2.11/srcs/scala-io-file_2.11-0.4.3-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

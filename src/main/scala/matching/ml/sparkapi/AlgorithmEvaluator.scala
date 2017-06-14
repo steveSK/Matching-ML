@@ -1,24 +1,39 @@
 package matching.ml.sparkapi
 
 import org.apache.spark.SparkConf
-import org.apache.spark.ml.{Pipeline, PipelineStage}
+import org.apache.spark.ml.{Pipeline, PipelineModel, PipelineStage}
 import org.apache.spark.ml.feature.{LabeledPoint, VectorSlicer}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{Dataset, SparkSession}
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 
 /**
+  * A class to evaluate machine learning algorithms
+  *
   * Created by stefan on 2/14/17.
   */
-class AlgorithmEvaluator(service: SparkService) {
+class AlgorithmEvaluator {
+
+  val service = SparkService
 
   import service.sparkSession.implicits._
 
-  def evaluateAlgorithmSetup(datasets: (RDD[LabeledPoint],RDD[LabeledPoint]),stages: Array[_ <: PipelineStage]): Double = {
+  def evaluateAlgorithmSetup(datasets: (Dataset[Row],Dataset[Row]),stages: Array[_ <: PipelineStage], modelDestination: Option[String] = None): Double = {
     val model = service.buildModel(datasets._1, stages)
-    service.evaluateTestDataML(datasets._2.toDF("label","features"),model)
+    if(modelDestination.isDefined){
+      model.save(modelDestination.get)
+    }
+    service.evaluateTestDataML(datasets._2,model)
   }
 
-  def evaluateFeature(datasets: (RDD[LabeledPoint],RDD[LabeledPoint]),stages: Array[_ <: PipelineStage], index: Int) : Double = {
+  /***
+    *  evaluate influence of one feature, by removing other features from training dataset
+    *
+    * @param datasets tupple containing training and test dataset
+    * @param stages pipeline stages for learning
+    * @param index index of feature to test
+    * @return return given metric(area underroc etc) of given model
+    */
+  def evaluateFeature(datasets: (Dataset[Row],Dataset[Row]),stages: Array[_ <: PipelineStage], index: Int) : Double = {
     val trainDF = datasets._1.toDF("label","ufeatures");
     val testDF = datasets._2.toDF("label","ufeatures");
     val transTrainDF = sliceFeatures(trainDF,"ufeatures","features",Array(index))
@@ -27,10 +42,20 @@ class AlgorithmEvaluator(service: SparkService) {
     service.evaluateTestDataML(transTestDF,model)
   }
 
-  def evaluateAgainstFeature(datasets: (RDD[LabeledPoint],RDD[LabeledPoint]),stages: Array[_ <: PipelineStage], index: Int, numOfFeaures: Int) : Double = {
+
+  /***
+    *  evaluate influence of feature agaisnt all features, by removing particular feature from training dataset
+    *
+    * @param datasets tupple containing training and test dataset
+    * @param stages pipeline stages for learning
+    * @param index index of feature to tremove
+    * @numOfFeatures number of features in dataset
+    * @return return given metric(area underroc etc) of given model
+    */
+  def evaluateAgainstFeature(datasets: (Dataset[Row],Dataset[Row]),stages: Array[_ <: PipelineStage], index: Int, numOfFeatures: Int) : Double = {
     val trainDF = datasets._1.toDF("label","ufeatures");
     val testDF = datasets._2.toDF("label","ufeatures");
-    val range = 0 to (numOfFeaures - 1)
+    val range = 0 to (numOfFeatures - 1)
 
     val indexes = range.toArray.filter(_ != index)
     val transTrainDF = sliceFeatures(trainDF,"ufeatures","features",indexes)
@@ -39,6 +64,14 @@ class AlgorithmEvaluator(service: SparkService) {
     service.evaluateTestDataML(transTestDF,model)
   }
 
+  /***
+    * slice subset of features from dataset
+    * @param dataset dataset to slice
+    * @param inputCol input feature column
+    * @param outputCol output feature column
+    * @param featuresToPick
+    * @return
+    */
   private def sliceFeatures(dataset : Dataset[_], inputCol : String, outputCol: String, featuresToPick: Array[Int]): Dataset[_] = {
     val slicer = new VectorSlicer().setInputCol(inputCol).setOutputCol(outputCol)
     slicer.setIndices(featuresToPick)

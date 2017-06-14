@@ -20,7 +20,10 @@ libraryDependencies += "org.apache.spark" % "spark-mllib_2.11" % "2.1.0"
 libraryDependencies += "org.apache.spark" % "spark-streaming_2.11" % "2.1.0"
 libraryDependencies += "org.apache.spark" % "spark-streaming-kafka-0-10_2.11" % "2.1.0"
 libraryDependencies += "org.apache.spark" % "spark-sql-kafka-0-10_2.11" % "2.1.0"
+libraryDependencies += "org.apache.kafka" % "kafka-clients" % "0.10.2.0"
 libraryDependencies += "com.typesafe" % "config" % "1.3.1"
+libraryDependencies += "com.github.scala-incubator.io" % "scala-io-file_2.11" % "0.4.3"
+
 
 assemblyMergeStrategy in assembly := {
   case PathList("javax", "inject", xs @ _*) => MergeStrategy.last
