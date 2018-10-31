@@ -20,6 +20,8 @@ import scala.io.Source
   */
 /***
   * case class for machine learning string matching containing pair of string and there attributes, for world check
+  *
+  *
   * @param string1 first string of pair
   * @param string2 second string of pair
   * @param uid - uid in world check

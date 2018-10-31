@@ -11,7 +11,7 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import scalax.file.Path
 
 /**
-  *   Copy of MatchingBatchMLJob for local debugging
+  *  Copy of MatchingBatchMLJob for local debugging (running spark locally without spark-job server)
   * Created by stefan on 4/11/17.
   */
 object MatchingBatchMLMain {

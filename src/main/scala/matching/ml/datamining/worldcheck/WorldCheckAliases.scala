@@ -108,6 +108,7 @@ class WorldCheckAliases(analyzer: Analyzer) {
 
   /***
     * generate first name frequency list from given file
+    *
     * @param inputFile input file
     * @param nameFreqList output freq list file
     */

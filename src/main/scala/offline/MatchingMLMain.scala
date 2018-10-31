@@ -1,19 +1,13 @@
-package matching.ml
+package offline
 
-import java.io.{FileInputStream, PrintWriter}
+import java.io.FileInputStream
 import java.util.Properties
 
 import matching.lucene.analyzers.SkipGramAnalyzerWithTokenizer
-import matching.lucene.datamining.WallCheckAliases
-import matching.lucene.distances.JaroWinklerStringDistance
 import matching.ml.datamining.worldcheck.{FeatureGenerator, WorldCheckAliases}
-import matching.ml.sparkapi.{AlgorithmEvaluator, SparkService}
+import matching.ml.sparkapi.SparkService
 import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.spark.ml.feature.{Bucketizer, InfoThSelector, QuantileDiscretizer}
 import org.apache.spark.ml.PipelineModel
-import org.apache.spark.ml.tuning.ParamGridBuilder
-import org.apache.spark.sql.ForeachWriter
-import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
 import scala.io.Source
 
