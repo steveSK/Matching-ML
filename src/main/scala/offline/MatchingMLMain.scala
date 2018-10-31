@@ -19,7 +19,7 @@ import scala.io.Source
 
 /**
   * Created by stefan on 12/9/16.
-  * this is used just like test main class to test different setups
+  * this is used just like test main class to test different setups, just for debugging purposes
   */
 object MatchingMLMain {
   private val analyzer = new SkipGramAnalyzerWithTokenizer(1, 3)
